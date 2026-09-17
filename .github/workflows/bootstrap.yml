@@ -1,8 +1,9 @@
 name: bootstrap
 
 # One-time (or rare) apply using the challenge IAM user credentials.
-# Creates: S3 state bucket, DynamoDB lock table, GitHub OIDC provider, sentinel-gha role.
-# Subsequent plan/apply on push uses OIDC (see deploy.yml). Do not apply from a laptop.
+# Creates S3 state bucket + sentinel-gha role.
+# GitHub OIDC provider is looked up (CreateOpenIDConnectProvider is denied).
+# DynamoDB locking is omitted (CreateTable is denied); GHA concurrency is the lock.
 
 on:
   workflow_dispatch:
@@ -73,12 +74,22 @@ jobs:
             && echo "Restored bootstrap state" \
             || echo "No prior bootstrap state (first run)"
 
+      - name: Import S3 bucket if it already exists outside state
+        run: |
+          ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
+          BUCKET="sentinel-tfstate-${ACCOUNT}-us-east-2"
+          if aws s3api head-bucket --bucket "${BUCKET}" 2>/dev/null; then
+            terraform state show aws_s3_bucket.state >/dev/null 2>&1 || terraform import -input=false aws_s3_bucket.state "${BUCKET}"
+            terraform state show aws_s3_bucket_versioning.state >/dev/null 2>&1 || terraform import -input=false aws_s3_bucket_versioning.state "${BUCKET}"
+            terraform state show aws_s3_bucket_server_side_encryption_configuration.state >/dev/null 2>&1 || terraform import -input=false aws_s3_bucket_server_side_encryption_configuration.state "${BUCKET}"
+            terraform state show aws_s3_bucket_public_access_block.state >/dev/null 2>&1 || terraform import -input=false aws_s3_bucket_public_access_block.state "${BUCKET}"
+          fi
+
       - name: terraform apply
         run: |
           terraform apply -input=false -auto-approve \
             -var="github_org=${{ github.repository_owner }}" \
-            -var="github_repo=${{ github.event.repository.name }}" \
-            -var="create_oidc_provider=${{ inputs.create_oidc_provider }}"
+            -var="github_repo=${{ github.event.repository.name }}"
 
       - name: Persist bootstrap state
         run: |

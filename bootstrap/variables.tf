@@ -21,9 +21,9 @@ variable "gha_role_name" {
 }
 
 variable "create_oidc_provider" {
-  description = "Create token.actions.githubusercontent.com OIDC provider. Set false if it already exists."
+  description = "Unused: the challenge user cannot CreateOpenIDConnectProvider. Kept so old workflow inputs still parse."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "existing_oidc_provider_arn" {

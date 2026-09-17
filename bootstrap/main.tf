@@ -39,19 +39,10 @@ resource "aws_s3_bucket_public_access_block" "state" {
   restrict_public_buckets = true
 }
 
-resource "aws_dynamodb_table" "lock" {
-  name         = "sentinel-tfstate-lock"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "LockID"
-
-  attribute {
-    name = "LockID"
-    type = "S"
-  }
-
-  tags = merge(var.tags, {
-    Name = "sentinel-tfstate-lock"
-  })
+# GitHub OIDC is account-global. The challenge IAM user cannot
+# iam:CreateOpenIDConnectProvider — look up the provider Rapyd already installed.
+data "aws_iam_openid_connect_provider" "github" {
+  url = "https://token.actions.githubusercontent.com"
 }
 
 module "gha" {
@@ -59,8 +50,8 @@ module "gha" {
 
   create_eks_roles           = false
   create_github_oidc         = true
-  create_oidc_provider       = var.create_oidc_provider
-  existing_oidc_provider_arn = var.existing_oidc_provider_arn
+  create_oidc_provider       = false
+  existing_oidc_provider_arn = data.aws_iam_openid_connect_provider.github.arn
   gha_role_name              = var.gha_role_name
   github_org                 = var.github_org
   github_repo                = var.github_repo
@@ -69,7 +60,6 @@ module "gha" {
     "environment:aws",
     "environment:bootstrap",
   ]
-  state_bucket_arn     = aws_s3_bucket.state.arn
-  state_lock_table_arn = aws_dynamodb_table.lock.arn
-  tags                 = var.tags
+  state_bucket_arn = aws_s3_bucket.state.arn
+  tags             = var.tags
 }

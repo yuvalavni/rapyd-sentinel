@@ -55,13 +55,14 @@ Actions → **bootstrap** → Run workflow.
 This uses the IAM user to create:
 
 - S3 bucket `sentinel-tfstate-<account>-us-east-2` (versioned, encrypted, public access blocked)
-- DynamoDB table `sentinel-tfstate-lock`
-- OIDC provider `token.actions.githubusercontent.com` (skip if it already exists: set the input to `false`)
 - Role **`sentinel-gha`**, assumable only from this repo’s `main` ref and the `aws` / `bootstrap` environments
 
 Copy `AWS_ACCOUNT_ID` from the job log into repository variables.
 
-If `iam:CreateOpenIDConnectProvider` is denied, stop. That is a guardrail, not something to bypass. In production you would ask the platform team to create the provider (account-wide, once) and pass `create_oidc_provider=false` plus the existing ARN.
+**Guardrails we hit and did not bypass**
+
+- `dynamodb:CreateTable` is denied. State locking uses GitHub Actions `concurrency` instead of DynamoDB.
+- `iam:CreateOpenIDConnectProvider` is denied. Bootstrap looks up the account’s existing GitHub OIDC provider and only creates the `sentinel-*` role. In production the platform team creates that provider once per account.
 
 ### 4. Deploy
 
@@ -195,4 +196,11 @@ Tear down after scoring: run `terraform destroy` from Actions (add a workflow or
 
 ## IAM permission failures
 
-If an API is denied (typical: OIDC provider, some `iam:PassRole`, CloudWatch): **do not** create roles outside `eks-` / `sentinel-` and **do not** attach extra unmanaged policies by hand. Record the error, the assumption, and the production fix (platform team grants the missing action on the existing prefixes).
+Observed on the challenge user `yuval.avni@gmail.com` in account `721500739616`:
+
+| Denied action | Response |
+| --- | --- |
+| `dynamodb:CreateTable` | No DynamoDB lock table. S3 state + Actions concurrency. |
+| `iam:CreateOpenIDConnectProvider` | Do not create the provider. Look up the existing GitHub OIDC provider; create only `sentinel-gha`. |
+
+Do **not** create roles outside `eks-` / `sentinel-` and do **not** attach extra unmanaged policies by hand.

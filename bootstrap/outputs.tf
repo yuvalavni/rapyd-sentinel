@@ -8,17 +8,12 @@ output "state_bucket" {
   value       = aws_s3_bucket.state.bucket
 }
 
-output "state_lock_table" {
-  description = "DynamoDB table for Terraform state locking."
-  value       = aws_dynamodb_table.lock.name
-}
-
 output "gha_role_arn" {
   description = "Role GitHub Actions assumes via OIDC after bootstrap."
   value       = module.gha.gha_role_arn
 }
 
 output "github_oidc_provider_arn" {
-  description = "GitHub OIDC provider ARN."
+  description = "GitHub OIDC provider ARN (looked up, not created)."
   value       = module.gha.github_oidc_provider_arn
 }

@@ -6,7 +6,6 @@ terraform {
     #   -backend-config="bucket=..."
     #   -backend-config="key=sentinel/terraform.tfstate"
     #   -backend-config="region=us-east-2"
-    #   -backend-config="dynamodb_table=sentinel-tfstate-lock"
     #   -backend-config="encrypt=true"
   }
 

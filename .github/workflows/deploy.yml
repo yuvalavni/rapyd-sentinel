@@ -185,7 +185,6 @@ jobs:
             -backend-config="bucket=sentinel-tfstate-${{ vars.AWS_ACCOUNT_ID }}-us-east-2" \
             -backend-config="key=sentinel/terraform.tfstate" \
             -backend-config="region=us-east-2" \
-            -backend-config="dynamodb_table=sentinel-tfstate-lock" \
             -backend-config="encrypt=true"
 
       - name: terraform plan
@@ -230,7 +229,6 @@ jobs:
             -backend-config="bucket=sentinel-tfstate-${{ vars.AWS_ACCOUNT_ID }}-us-east-2" \
             -backend-config="key=sentinel/terraform.tfstate" \
             -backend-config="region=us-east-2" \
-            -backend-config="dynamodb_table=sentinel-tfstate-lock" \
             -backend-config="encrypt=true"
 
       - name: terraform apply saved plan
