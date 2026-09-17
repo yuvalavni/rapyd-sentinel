@@ -20,18 +20,6 @@ variable "gha_role_name" {
   default     = "sentinel-gha"
 }
 
-variable "create_oidc_provider" {
-  description = "Unused: the challenge user cannot CreateOpenIDConnectProvider. Kept so old workflow inputs still parse."
-  type        = bool
-  default     = false
-}
-
-variable "existing_oidc_provider_arn" {
-  description = "Existing GitHub OIDC provider ARN when create_oidc_provider is false."
-  type        = string
-  default     = ""
-}
-
 variable "tags" {
   description = "Common tags."
   type        = map(string)
