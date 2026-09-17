@@ -46,13 +46,16 @@ if "imagePullSecrets:" not in text:
 PY
 }
 
-echo "==> apply backend"
+echo "==> wait for backend nodes to be Ready"
 export KUBECONFIG="${HOME}/.kube/sentinel-backend"
+kubectl wait node --all --for=condition=Ready --timeout=600s
+
+echo "==> apply backend"
 if [[ -n "${GHCR_TOKEN:-}" ]]; then
   inject_pull_secret "${RENDER_DIR}/backend/backend.yaml"
 fi
 kubectl apply -f "${RENDER_DIR}/backend/backend.yaml"
-kubectl -n sentinel-backend rollout status deployment/backend --timeout=180s
+kubectl -n sentinel-backend rollout status deployment/backend --timeout=600s
 
 echo "==> wait for internal NLB"
 for i in $(seq 1 60); do
@@ -72,13 +75,16 @@ fi
 export BACKEND_HOST
 "${ROOT}/scripts/render-manifests.sh"
 
-echo "==> apply gateway (upstream ${BACKEND_HOST})"
+echo "==> wait for gateway nodes to be Ready"
 export KUBECONFIG="${HOME}/.kube/sentinel-gateway"
+kubectl wait node --all --for=condition=Ready --timeout=600s
+
+echo "==> apply gateway (upstream ${BACKEND_HOST})"
 if [[ -n "${GHCR_TOKEN:-}" ]]; then
   inject_pull_secret "${RENDER_DIR}/gateway/gateway.yaml"
 fi
 kubectl apply -f "${RENDER_DIR}/gateway/gateway.yaml"
-kubectl -n sentinel-gateway rollout status deployment/gateway --timeout=180s
+kubectl -n sentinel-gateway rollout status deployment/gateway --timeout=600s
 
 echo "==> wait for public NLB"
 for i in $(seq 1 60); do
