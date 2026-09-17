@@ -19,6 +19,7 @@ concurrency:
 
 env:
   AWS_REGION: us-east-2
+  GHA_ROLE_NAME: sentinel-gha-ci3   # change this when rotating the deploy role
   TF_IN_AUTOMATION: "true"
   TF_VERSION: "1.9.8"
   WORKING_DIR: environments/sentinel
@@ -180,8 +181,8 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/sentinel-gha-ci3
-          aws-region: us-east-2
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ env.GHA_ROLE_NAME }}
+          aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
           role-skip-session-tagging: true
 
@@ -193,9 +194,9 @@ jobs:
       - name: terraform init
         run: |
           terraform init -input=false \
-            -backend-config="bucket=sentinel-tfstate-${{ vars.AWS_ACCOUNT_ID }}-us-east-2" \
+            -backend-config="bucket=sentinel-tfstate-${{ vars.AWS_ACCOUNT_ID }}-${{ env.AWS_REGION }}" \
             -backend-config="key=sentinel/terraform.tfstate" \
-            -backend-config="region=us-east-2" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
             -backend-config="encrypt=true"
 
       - name: terraform plan
@@ -223,8 +224,8 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/sentinel-gha-ci3
-          aws-region: us-east-2
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ env.GHA_ROLE_NAME }}
+          aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
           role-skip-session-tagging: true
 
@@ -241,9 +242,9 @@ jobs:
       - name: terraform init
         run: |
           terraform init -input=false \
-            -backend-config="bucket=sentinel-tfstate-${{ vars.AWS_ACCOUNT_ID }}-us-east-2" \
+            -backend-config="bucket=sentinel-tfstate-${{ vars.AWS_ACCOUNT_ID }}-${{ env.AWS_REGION }}" \
             -backend-config="key=sentinel/terraform.tfstate" \
-            -backend-config="region=us-east-2" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
             -backend-config="encrypt=true"
 
       - name: Import pre-existing IAM roles into state (idempotent)
@@ -271,8 +272,8 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/sentinel-gha-ci3
-          aws-region: us-east-2
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ env.GHA_ROLE_NAME }}
+          aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
           role-skip-session-tagging: true
 
@@ -306,8 +307,8 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/sentinel-gha-ci3
-          aws-region: us-east-2
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ env.GHA_ROLE_NAME }}
+          aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
           role-skip-session-tagging: true
 

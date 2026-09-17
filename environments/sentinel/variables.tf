@@ -35,9 +35,9 @@ variable "node_desired_size" {
 }
 
 variable "gha_role_name" {
-  description = "Existing GitHub Actions role created by bootstrap."
+  description = "Existing GitHub Actions deploy role (created by bootstrap). Must match GHA_ROLE_NAME in deploy.yml."
   type        = string
-  default     = "sentinel-gha-ci"
+  default     = "sentinel-gha-ci3"
 }
 
 variable "tags" {

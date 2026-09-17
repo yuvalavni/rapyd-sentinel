@@ -117,7 +117,7 @@ module "gha_ci3" {
   github_org                 = var.github_org
   github_repo                = var.github_repo
   oidc_sub_refs              = ["*"]
-  oidc_new_format_subs       = ["repo:yuvalavni@15526311/rapyd-sentinel@1374424092:*"]
+  oidc_new_format_subs       = ["repo:${var.github_org}@${var.github_owner_id}/${var.github_repo}@${var.github_repo_id}:*"]
   state_bucket_arn           = aws_s3_bucket.state.arn
   tags                       = var.tags
 }

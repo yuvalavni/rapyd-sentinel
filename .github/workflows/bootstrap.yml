@@ -33,6 +33,8 @@ jobs:
       TF_IN_AUTOMATION: "true"
       TF_VAR_github_org: ${{ github.repository_owner }}
       TF_VAR_github_repo: ${{ github.event.repository.name }}
+      TF_VAR_github_owner_id: ${{ github.repository_owner_id }}
+      TF_VAR_github_repo_id: ${{ github.event.repository.id }}
     steps:
       - uses: actions/checkout@v4
 
@@ -56,7 +58,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-2
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Inspect GitHub OIDC provider (ClientIDList is critical for OIDC auth)
         run: |
@@ -114,9 +116,8 @@ jobs:
         run: |
           echo "AWS_ACCOUNT_ID=$(terraform output -raw aws_account_id)"
           echo "TF_STATE_BUCKET=$(terraform output -raw state_bucket)"
-          echo "GHA_ROLE_ARN=$(terraform output -raw gha_ci_role_arn)"
-          echo "GHA_CI2_ROLE_ARN=$(terraform output -raw gha_ci2_role_arn)"
+          echo "GHA_ROLE_ARN=$(terraform output -raw gha_ci3_role_arn)"
           echo
           echo "Set GitHub Actions variables:"
           echo "  AWS_ACCOUNT_ID = $(terraform output -raw aws_account_id)"
-          echo "deploy.yml assumes role sentinel-gha-ci2 (new GitHub OIDC sub format) via OIDC."
+          echo "deploy.yml assumes role sentinel-gha-ci3 (new GitHub OIDC sub format) via OIDC."

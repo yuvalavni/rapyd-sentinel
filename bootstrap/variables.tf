@@ -14,6 +14,16 @@ variable "github_repo" {
   type        = string
 }
 
+variable "github_owner_id" {
+  description = "GitHub owner numeric ID (github.repository_owner_id). Used for new-format OIDC sub claim."
+  type        = string
+}
+
+variable "github_repo_id" {
+  description = "GitHub repository numeric ID (github.repository_id). Used for new-format OIDC sub claim."
+  type        = string
+}
+
 variable "tags" {
   description = "Common tags."
   type        = map(string)
