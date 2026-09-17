@@ -20,9 +20,14 @@ locals {
     var.create_oidc_provider ? aws_iam_openid_connect_provider.github[0].arn : var.existing_oidc_provider_arn
   ) : ""
 
-  github_subs = [
-    for ref in var.oidc_sub_refs : "repo:${var.github_org}/${var.github_repo}:${ref}"
-  ]
+  # GitHub's OIDC sub claim changed format in 2025 to include numeric IDs:
+  #   OLD: repo:owner/repo:ref
+  #   NEW: repo:owner@ownerID/repo@repoID:ref
+  # Include both patterns so the role works with both formats (and any GitHub runner version).
+  github_subs = concat(
+    [for ref in var.oidc_sub_refs : "repo:${var.github_org}/${var.github_repo}:${ref}"],
+    [for ref in var.oidc_sub_refs : "repo:${var.github_org}@*/${var.github_repo}@*:${ref}"]
+  )
 }
 
 data "aws_iam_policy_document" "gha_assume" {
@@ -276,10 +281,7 @@ resource "aws_iam_role" "gha" {
   assume_role_policy = data.aws_iam_policy_document.gha_assume[0].json
   description        = "GitHub Actions deploy role via OIDC (prefix sentinel-)."
 
-  # Challenge IAM user is denied iam:TagRole.
-  lifecycle {
-    ignore_changes = [assume_role_policy]
-  }
+  # Note: iam:TagRole is denied for the bootstrap IAM user — do not add tags here.
 }
 
 resource "aws_iam_role_policy" "gha" {
