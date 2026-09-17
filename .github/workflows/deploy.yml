@@ -89,8 +89,9 @@ jobs:
 
       - name: kubectl apply --dry-run=client
         run: |
-          kubectl apply --dry-run=client -f /tmp/sentinel-k8s/backend
-          kubectl apply --dry-run=client -f /tmp/sentinel-k8s/gateway
+          # --validate=false: no cluster on this runner; kubeconform already checked schemas.
+          kubectl apply --dry-run=client --validate=false -f /tmp/sentinel-k8s/backend
+          kubectl apply --dry-run=client --validate=false -f /tmp/sentinel-k8s/gateway
 
   build-and-push:
     name: build-and-push
