@@ -246,6 +246,15 @@ jobs:
             -backend-config="region=us-east-2" \
             -backend-config="encrypt=true"
 
+      - name: Import pre-existing IAM roles into state (idempotent)
+        run: |
+          # EKS cluster roles may already exist from a previous partial apply.
+          # Import is safe to run repeatedly; fails silently if already in state.
+          terraform import -input=false module.iam_gateway.aws_iam_role.cluster[0] eks-gateway-cluster 2>&1 | grep -v "already managed" || true
+          terraform import -input=false module.iam_backend.aws_iam_role.cluster[0]  eks-backend-cluster  2>&1 | grep -v "already managed" || true
+          terraform import -input=false module.iam_gateway.aws_iam_role.nodes[0]   eks-gateway-nodes    2>&1 | grep -v "already managed" || true
+          terraform import -input=false module.iam_backend.aws_iam_role.nodes[0]   eks-backend-nodes    2>&1 | grep -v "already managed" || true
+
       - name: terraform apply saved plan
         run: terraform apply -input=false tfplan
 
