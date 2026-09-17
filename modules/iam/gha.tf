@@ -275,7 +275,10 @@ resource "aws_iam_role" "gha" {
   name               = var.gha_role_name
   assume_role_policy = data.aws_iam_policy_document.gha_assume[0].json
   description        = "GitHub Actions deploy role via OIDC (prefix sentinel-)."
-  # Challenge IAM user is denied iam:TagRole. sentinel-gha can tag eks-* later.
+  # Challenge IAM user is denied iam:TagRole and iam:UpdateAssumeRolePolicy.
+  lifecycle {
+    ignore_changes = [assume_role_policy]
+  }
 }
 
 resource "aws_iam_role_policy" "gha" {
