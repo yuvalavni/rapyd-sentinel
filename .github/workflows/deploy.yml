@@ -247,14 +247,26 @@ jobs:
             -backend-config="region=${{ env.AWS_REGION }}" \
             -backend-config="encrypt=true"
 
-      - name: Import pre-existing IAM roles into state (idempotent)
+      - name: Import pre-existing resources into state (idempotent)
         run: |
-          # EKS cluster roles may already exist from a previous partial apply.
-          # Import is safe to run repeatedly; fails silently if already in state.
+          ACCT="${{ vars.AWS_ACCOUNT_ID }}"
+
+          # EKS cluster IAM roles may already exist from a previous partial apply.
           terraform import -input=false module.iam_gateway.aws_iam_role.cluster[0] eks-gateway-cluster 2>&1 | grep -v "already managed" || true
           terraform import -input=false module.iam_backend.aws_iam_role.cluster[0]  eks-backend-cluster  2>&1 | grep -v "already managed" || true
           terraform import -input=false module.iam_gateway.aws_iam_role.nodes[0]   eks-gateway-nodes    2>&1 | grep -v "already managed" || true
           terraform import -input=false module.iam_backend.aws_iam_role.nodes[0]   eks-backend-nodes    2>&1 | grep -v "already managed" || true
+
+          # EKS access entries — EKS may auto-create one for the caller role when
+          # bootstrap_cluster_creator_admin_permissions was previously true.
+          # Import is safe: silently fails if resource doesn't exist yet or is already in state.
+          GHA_ARN="arn:aws:iam::${ACCT}:role/${{ env.GHA_ROLE_NAME }}"
+          terraform import -input=false "module.eks_gateway.aws_eks_access_entry.deployer" "eks-gateway:${GHA_ARN}" 2>&1 | grep -v "already managed" || true
+          terraform import -input=false "module.eks_backend.aws_eks_access_entry.deployer"  "eks-backend:${GHA_ARN}"  2>&1 | grep -v "already managed" || true
+
+          POLICY_ARN="arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          terraform import -input=false "module.eks_gateway.aws_eks_access_policy_association.deployer" "eks-gateway:${POLICY_ARN}:${GHA_ARN}" 2>&1 | grep -v "already managed" || true
+          terraform import -input=false "module.eks_backend.aws_eks_access_policy_association.deployer"  "eks-backend:${POLICY_ARN}:${GHA_ARN}"  2>&1 | grep -v "already managed" || true
 
       - name: terraform apply saved plan
         run: terraform apply -input=false tfplan

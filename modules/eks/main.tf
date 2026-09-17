@@ -11,8 +11,11 @@ resource "aws_eks_cluster" "this" {
   }
 
   access_config {
-    authentication_mode                         = "API"
-    bootstrap_cluster_creator_admin_permissions = true
+    authentication_mode = "API"
+    # Set to false so Terraform owns ALL access entries explicitly.
+    # With true, EKS auto-creates an entry for the caller role, which
+    # causes a 409 conflict when Terraform then tries to create aws_eks_access_entry.deployer.
+    bootstrap_cluster_creator_admin_permissions = false
   }
 
   enabled_cluster_log_types = ["api", "audit", "authenticator"]
