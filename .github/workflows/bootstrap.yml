@@ -1,0 +1,97 @@
+name: bootstrap
+
+# One-time (or rare) apply using the challenge IAM user credentials.
+# Creates: S3 state bucket, DynamoDB lock table, GitHub OIDC provider, sentinel-gha role.
+# Subsequent plan/apply on push uses OIDC (see deploy.yml). Do not apply from a laptop.
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_oidc_provider:
+        description: "Create the GitHub OIDC provider (false if one already exists)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sentinel-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    name: bootstrap-oidc-and-state
+    runs-on: ubuntu-latest
+    environment: bootstrap
+    defaults:
+      run:
+        working-directory: bootstrap
+    env:
+      AWS_REGION: us-east-2
+      TF_IN_AUTOMATION: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      - name: Require bootstrap IAM user secrets
+        env:
+          KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        run: |
+          if [ -z "${KEY_ID}" ]; then
+            echo "Set GitHub secrets AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (challenge IAM user)."
+            echo "These are used only for this bootstrap workflow."
+            exit 1
+          fi
+
+      - name: Configure AWS credentials (IAM user, bootstrap only)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: terraform fmt
+        working-directory: .
+        run: terraform fmt -check -recursive
+
+      - name: terraform init
+        run: terraform init -input=false
+
+      - name: terraform validate
+        run: terraform validate
+
+      - name: Restore bootstrap state from S3 if present
+        run: |
+          ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
+          BUCKET="sentinel-tfstate-${ACCOUNT}-us-east-2"
+          aws s3 cp "s3://${BUCKET}/bootstrap/terraform.tfstate" terraform.tfstate \
+            && echo "Restored bootstrap state" \
+            || echo "No prior bootstrap state (first run)"
+
+      - name: terraform apply
+        run: |
+          terraform apply -input=false -auto-approve \
+            -var="github_org=${{ github.repository_owner }}" \
+            -var="github_repo=${{ github.event.repository.name }}" \
+            -var="create_oidc_provider=${{ inputs.create_oidc_provider }}"
+
+      - name: Persist bootstrap state
+        run: |
+          ACCOUNT="$(terraform output -raw aws_account_id)"
+          BUCKET="$(terraform output -raw state_bucket)"
+          aws s3 cp terraform.tfstate "s3://${BUCKET}/bootstrap/terraform.tfstate"
+
+      - name: Print outputs (no secrets)
+        run: |
+          echo "AWS_ACCOUNT_ID=$(terraform output -raw aws_account_id)"
+          echo "TF_STATE_BUCKET=$(terraform output -raw state_bucket)"
+          echo "GHA_ROLE_ARN=$(terraform output -raw gha_role_arn)"
+          echo
+          echo "Set GitHub Actions variables:"
+          echo "  AWS_ACCOUNT_ID = $(terraform output -raw aws_account_id)"
+          echo "Then push to main; deploy.yml assumes role sentinel-gha via OIDC."

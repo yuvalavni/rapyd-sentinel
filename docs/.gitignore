@@ -1,0 +1,3 @@
+# Challenge IAM user CSV — never commit
+*.csv
+*accessKeys*

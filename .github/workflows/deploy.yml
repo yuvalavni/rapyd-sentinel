@@ -1,0 +1,293 @@
+name: deploy
+
+# Mandatory apply path. Never terraform apply from a laptop.
+# Stages: validate TF → plan (OIDC) → apply (OIDC) → validate k8s / build → deploy → smoke.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+
+concurrency:
+  group: sentinel-us-east-2
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-2
+  TF_IN_AUTOMATION: "true"
+  TF_VERSION: "1.9.8"
+  WORKING_DIR: environments/sentinel
+
+jobs:
+  validate-terraform:
+    name: validate-terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.54.0
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: tflint init
+        run: tflint --init
+
+      - name: tflint
+        run: tflint --recursive
+
+      - name: terraform init / validate (bootstrap, no backend)
+        working-directory: bootstrap
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
+      - name: terraform init / validate (sentinel, no backend)
+        working-directory: environments/sentinel
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
+  validate-k8s:
+    name: validate-k8s
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: v1.31.4
+
+      - name: Install kubeconform
+        env:
+          KC_VERSION: v0.6.7
+        run: |
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/${KC_VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin kubeconform
+
+      - name: Render manifests with placeholders
+        env:
+          GHCR_OWNER: example
+          IMAGE_TAG: deadbeef
+          BACKEND_HOST: backend.internal.example
+        run: ./scripts/render-manifests.sh
+
+      - name: kubeconform
+        run: kubeconform -strict -summary /tmp/sentinel-k8s/backend /tmp/sentinel-k8s/gateway
+
+      - name: kubectl apply --dry-run=client
+        run: |
+          kubectl apply --dry-run=client -f /tmp/sentinel-k8s/backend
+          kubectl apply --dry-run=client -f /tmp/sentinel-k8s/gateway
+
+  build-and-push:
+    name: build-and-push
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+      owner: ${{ steps.meta.outputs.owner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Image coordinates
+        id: meta
+        run: |
+          owner="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          echo "owner=${owner}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: apps/backend
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/sentinel-backend:${{ github.sha }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/sentinel-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: apps/gateway
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/sentinel-gateway:${{ github.sha }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/sentinel-gateway:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Best-effort public GHCR packages (no cluster pull secret)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ steps.meta.outputs.owner }}
+        run: |
+          set +e
+          if [ "${{ github.event.repository.owner.type }}" = "Organization" ]; then
+            gh api --method PUT "orgs/${OWNER}/packages/container/sentinel-backend/visibility" -f visibility=public
+            gh api --method PUT "orgs/${OWNER}/packages/container/sentinel-gateway/visibility" -f visibility=public
+          else
+            gh api --method PUT "user/packages/container/sentinel-backend/visibility" -f visibility=public
+            gh api --method PUT "user/packages/container/sentinel-gateway/visibility" -f visibility=public
+          fi
+
+  plan:
+    name: plan
+    needs: [validate-terraform]
+    runs-on: ubuntu-latest
+    environment: aws
+    defaults:
+      run:
+        working-directory: environments/sentinel
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require AWS_ACCOUNT_ID
+        run: |
+          if [ -z "${{ vars.AWS_ACCOUNT_ID }}" ]; then
+            echo "Set Actions variable AWS_ACCOUNT_ID (printed by the bootstrap workflow), then re-run."
+            exit 1
+          fi
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/sentinel-gha
+          aws-region: us-east-2
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: terraform init
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=sentinel-tfstate-${{ vars.AWS_ACCOUNT_ID }}-us-east-2" \
+            -backend-config="key=sentinel/terraform.tfstate" \
+            -backend-config="region=us-east-2" \
+            -backend-config="dynamodb_table=sentinel-tfstate-lock" \
+            -backend-config="encrypt=true"
+
+      - name: terraform plan
+        run: terraform plan -input=false -out=tfplan
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: environments/sentinel/tfplan
+          if-no-files-found: error
+          retention-days: 5
+
+  apply:
+    name: apply
+    needs: [plan]
+    runs-on: ubuntu-latest
+    environment: aws
+    defaults:
+      run:
+        working-directory: environments/sentinel
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/sentinel-gha
+          aws-region: us-east-2
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: environments/sentinel
+
+      - name: terraform init
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=sentinel-tfstate-${{ vars.AWS_ACCOUNT_ID }}-us-east-2" \
+            -backend-config="key=sentinel/terraform.tfstate" \
+            -backend-config="region=us-east-2" \
+            -backend-config="dynamodb_table=sentinel-tfstate-lock" \
+            -backend-config="encrypt=true"
+
+      - name: terraform apply saved plan
+        run: terraform apply -input=false tfplan
+
+  deploy:
+    name: deploy
+    needs: [apply, validate-k8s, build-and-push]
+    runs-on: ubuntu-latest
+    environment: aws
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/sentinel-gha
+          aws-region: us-east-2
+
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: v1.31.4
+
+      - name: Deploy proxy and backend
+        env:
+          GHCR_OWNER: ${{ needs.build-and-push.outputs.owner }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: ./scripts/deploy-apps.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gateway-nlb
+          path: /tmp/sentinel-gateway-nlb
+          if-no-files-found: error
+          retention-days: 5
+
+  smoke:
+    name: smoke
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    environment: aws
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/sentinel-gha
+          aws-region: us-east-2
+
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: v1.31.4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: gateway-nlb
+          path: /tmp
+
+      - name: curl public gateway
+        run: ./scripts/smoke.sh

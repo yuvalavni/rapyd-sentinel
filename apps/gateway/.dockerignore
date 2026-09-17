@@ -1,0 +1,5 @@
+*
+!default.conf.template
+!nginx.conf
+!docker-entrypoint.sh
+!Dockerfile
