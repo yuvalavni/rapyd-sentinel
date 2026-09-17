@@ -178,6 +178,16 @@ jobs:
             exit 1
           fi
 
+      - name: Debug OIDC token claims (aud + sub must match role trust policy)
+        run: |
+          TOKEN=$(curl -sSL \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" \
+            | jq -r '.value')
+          PAYLOAD=$(echo "${TOKEN}" | cut -d. -f2 | awk 'length%4!=0{$0=$0 substr("====",length%4)}{print}' | base64 -d 2>/dev/null)
+          echo "--- OIDC token claims ---"
+          echo "${PAYLOAD}" | jq '{iss, aud, sub, ref, repository, workflow}'
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/sentinel-gha-ci

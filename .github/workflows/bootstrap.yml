@@ -58,6 +58,20 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-2
 
+      - name: Inspect GitHub OIDC provider (ClientIDList is critical for OIDC auth)
+        run: |
+          OIDC_ARN=$(aws iam list-open-id-connect-providers \
+            --query "OpenIDConnectProviderList[?ends_with(Arn,'token.actions.githubusercontent.com')].Arn" \
+            --output text)
+          echo "OIDC Provider ARN: ${OIDC_ARN}"
+          if [ -n "${OIDC_ARN}" ]; then
+            aws iam get-open-id-connect-provider \
+              --open-id-connect-provider-arn "${OIDC_ARN}" \
+              --query '{ClientIDList: ClientIDList, ThumbprintList: ThumbprintList}'
+          else
+            echo "No GitHub OIDC provider found!"
+          fi
+
       - name: terraform fmt
         working-directory: .
         run: terraform fmt -check -recursive
