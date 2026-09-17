@@ -18,6 +18,11 @@ output "gha_ci_role_arn" {
   value       = module.gha_ci.gha_role_arn
 }
 
+output "gha_ci2_role_arn" {
+  description = "New role with dual old/new GitHub OIDC sub format trust (sentinel-gha-ci2)."
+  value       = module.gha_ci2.gha_role_arn
+}
+
 output "github_oidc_provider_arn" {
   description = "GitHub OIDC provider ARN (looked up, not created)."
   value       = module.gha.github_oidc_provider_arn

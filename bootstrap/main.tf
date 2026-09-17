@@ -80,3 +80,21 @@ module "gha_ci" {
   state_bucket_arn           = aws_s3_bucket.state.arn
   tags                       = var.tags
 }
+
+# sentinel-gha-ci was created before GitHub changed its OIDC sub format to include
+# numeric IDs (owner@id/repo@id). iam:UpdateAssumeRolePolicy is denied, so we create
+# a new role that is provisioned with both old and new sub patterns from the start.
+module "gha_ci2" {
+  source = "../modules/iam"
+
+  create_eks_roles           = false
+  create_github_oidc         = true
+  create_oidc_provider       = false
+  existing_oidc_provider_arn = data.aws_iam_openid_connect_provider.github.arn
+  gha_role_name              = "sentinel-gha-ci2"
+  github_org                 = var.github_org
+  github_repo                = var.github_repo
+  oidc_sub_refs              = ["*"]
+  state_bucket_arn           = aws_s3_bucket.state.arn
+  tags                       = var.tags
+}

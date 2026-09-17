@@ -281,7 +281,11 @@ resource "aws_iam_role" "gha" {
   assume_role_policy = data.aws_iam_policy_document.gha_assume[0].json
   description        = "GitHub Actions deploy role via OIDC (prefix sentinel-)."
 
-  # Note: iam:TagRole is denied for the bootstrap IAM user — do not add tags here.
+  # iam:TagRole and iam:UpdateAssumeRolePolicy are both denied for the bootstrap IAM user.
+  # Ignore changes to assume_role_policy to prevent bootstrap from failing on existing roles.
+  lifecycle {
+    ignore_changes = [assume_role_policy]
+  }
 }
 
 resource "aws_iam_role_policy" "gha" {
