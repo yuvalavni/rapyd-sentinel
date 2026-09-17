@@ -46,6 +46,12 @@ variable "oidc_sub_refs" {
   default     = ["*"]
 }
 
+variable "oidc_new_format_subs" {
+  description = "Raw OIDC sub patterns for the new GitHub format (owner@id/repo@id). Use trailing * for safety. These are appended verbatim to StringLike values."
+  type        = list(string)
+  default     = []
+}
+
 variable "state_bucket_arn" {
   description = "Terraform state S3 bucket ARN granted to sentinel-gha."
   type        = string

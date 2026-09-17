@@ -83,7 +83,11 @@ module "gha_ci" {
 
 # sentinel-gha-ci was created before GitHub changed its OIDC sub format to include
 # numeric IDs (owner@id/repo@id). iam:UpdateAssumeRolePolicy is denied, so we create
-# a new role that is provisioned with both old and new sub patterns from the start.
+# a new role provisioned with BOTH old and new sub patterns from the start.
+# New format discovered from OIDC token diagnostic:
+#   repo:yuvalavni@15526311/rapyd-sentinel@1374424092:<ref>
+# The pattern below uses a trailing * which works with AWS StringLike regardless of
+# whether the matching is greedy or uses backtracking.
 module "gha_ci2" {
   source = "../modules/iam"
 
@@ -95,6 +99,7 @@ module "gha_ci2" {
   github_org                 = var.github_org
   github_repo                = var.github_repo
   oidc_sub_refs              = ["*"]
+  oidc_new_format_subs       = ["repo:yuvalavni@15526311/rapyd-sentinel@1374424092:*"]
   state_bucket_arn           = aws_s3_bucket.state.arn
   tags                       = var.tags
 }

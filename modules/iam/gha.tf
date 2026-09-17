@@ -23,10 +23,13 @@ locals {
   # GitHub's OIDC sub claim changed format in 2025 to include numeric IDs:
   #   OLD: repo:owner/repo:ref
   #   NEW: repo:owner@ownerID/repo@repoID:ref
-  # Include both patterns so the role works with both formats (and any GitHub runner version).
+  # The old-format pattern uses StringLike with oidc_sub_refs composed in.
+  # The new-format pattern uses a trailing wildcard so it works with AWS StringLike
+  # regardless of whether the implementation is greedy or uses backtracking.
   github_subs = concat(
     [for ref in var.oidc_sub_refs : "repo:${var.github_org}/${var.github_repo}:${ref}"],
-    [for ref in var.oidc_sub_refs : "repo:${var.github_org}@*/${var.github_repo}@*:${ref}"]
+    # New GitHub OIDC format: prefix is fixed, trailing * covers ref/environment/etc.
+    var.oidc_new_format_subs
   )
 }
 
