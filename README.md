@@ -202,5 +202,6 @@ Observed on the challenge user `yuval.avni@gmail.com` in account `721500739616`:
 | --- | --- |
 | `dynamodb:CreateTable` | No DynamoDB lock table. S3 state + Actions concurrency. |
 | `iam:CreateOpenIDConnectProvider` | Do not create the provider. Look up the existing GitHub OIDC provider; create only `sentinel-gha`. |
+| `iam:TagRole` | Create `sentinel-gha` without tags. |
 
 Do **not** create roles outside `eks-` / `sentinel-` and do **not** attach extra unmanaged policies by hand.
