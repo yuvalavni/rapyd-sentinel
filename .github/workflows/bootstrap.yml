@@ -31,6 +31,8 @@ jobs:
     env:
       AWS_REGION: us-east-2
       TF_IN_AUTOMATION: "true"
+      TF_VAR_github_org: ${{ github.repository_owner }}
+      TF_VAR_github_repo: ${{ github.event.repository.name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -86,10 +88,7 @@ jobs:
           fi
 
       - name: terraform apply
-        run: |
-          terraform apply -input=false -auto-approve \
-            -var="github_org=${{ github.repository_owner }}" \
-            -var="github_repo=${{ github.event.repository.name }}"
+        run: terraform apply -input=false -auto-approve
 
       - name: Persist bootstrap state
         run: |
