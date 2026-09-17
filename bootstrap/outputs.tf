@@ -23,6 +23,11 @@ output "gha_ci2_role_arn" {
   value       = module.gha_ci2.gha_role_arn
 }
 
+output "gha_ci3_role_arn" {
+  description = "Definitive OIDC role with exact numeric-ID GitHub sub pattern (sentinel-gha-ci3)."
+  value       = module.gha_ci3.gha_role_arn
+}
+
 output "github_oidc_provider_arn" {
   description = "GitHub OIDC provider ARN (looked up, not created)."
   value       = module.gha.github_oidc_provider_arn

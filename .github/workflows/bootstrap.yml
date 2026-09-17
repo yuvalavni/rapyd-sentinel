@@ -101,16 +101,6 @@ jobs:
             terraform state show aws_s3_bucket_public_access_block.state >/dev/null 2>&1 || terraform import -input=false aws_s3_bucket_public_access_block.state "${BUCKET}"
           fi
 
-      - name: Delete sentinel-gha-ci2 from state so it gets recreated with correct trust policy
-        run: |
-          terraform state rm module.gha_ci2.aws_iam_role.gha[0] 2>/dev/null || true
-          terraform state rm module.gha_ci2.aws_iam_role_policy.gha[0] 2>/dev/null || true
-          terraform state rm module.gha_ci2.terraform_data.role_prefix_guard 2>/dev/null || true
-          # Delete the AWS role so Terraform can recreate it with the correct trust policy
-          aws iam delete-role-policy --role-name sentinel-gha-ci2 --policy-name sentinel-gha-infra 2>/dev/null || true
-          aws iam delete-role --role-name sentinel-gha-ci2 2>/dev/null || true
-          echo "Cleared sentinel-gha-ci2; Terraform will recreate it with new format trust policy."
-
       - name: terraform apply
         run: terraform apply -input=false -auto-approve
 
