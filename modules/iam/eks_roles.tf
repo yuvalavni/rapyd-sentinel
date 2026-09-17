@@ -32,6 +32,12 @@ resource "aws_iam_role" "cluster" {
   assume_role_policy = data.aws_iam_policy_document.cluster_assume.json
   description        = "EKS control plane role (prefix eks- required by challenge IAM guardrail)."
   tags               = var.tags
+
+  # iam:UpdateRoleDescription is denied; ignore drift on description and tags
+  # so that imported pre-existing roles don't trigger a forbidden update.
+  lifecycle {
+    ignore_changes = [description, tags]
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "cluster" {
@@ -60,6 +66,10 @@ resource "aws_iam_role" "nodes" {
   assume_role_policy = data.aws_iam_policy_document.node_assume.json
   description        = "EKS managed node role (prefix eks- required by challenge IAM guardrail)."
   tags               = var.tags
+
+  lifecycle {
+    ignore_changes = [description, tags]
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "nodes_worker" {
