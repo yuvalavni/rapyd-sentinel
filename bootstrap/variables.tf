@@ -14,12 +14,6 @@ variable "github_repo" {
   type        = string
 }
 
-variable "gha_role_name" {
-  description = "OIDC deploy role. Must use sentinel- prefix."
-  type        = string
-  default     = "sentinel-gha"
-}
-
 variable "tags" {
   description = "Common tags."
   type        = map(string)
