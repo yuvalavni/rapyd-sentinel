@@ -21,7 +21,9 @@ resource "aws_vpc_peering_connection_options" "this" {
 }
 
 resource "aws_route" "requester_to_accepter" {
-  for_each = toset(var.requester_route_table_ids)
+  # Use index-based keys so the for_each keyset is known at plan time,
+  # even though the route table ID values are only known after apply.
+  for_each = { for i, id in var.requester_route_table_ids : tostring(i) => id }
 
   route_table_id            = each.value
   destination_cidr_block    = var.accepter_cidr
@@ -29,7 +31,7 @@ resource "aws_route" "requester_to_accepter" {
 }
 
 resource "aws_route" "accepter_to_requester" {
-  for_each = toset(var.accepter_route_table_ids)
+  for_each = { for i, id in var.accepter_route_table_ids : tostring(i) => id }
 
   route_table_id            = each.value
   destination_cidr_block    = var.requester_cidr
