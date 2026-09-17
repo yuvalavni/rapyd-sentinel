@@ -67,30 +67,70 @@ data "aws_iam_policy_document" "gha" {
   count = var.create_github_oidc ? 1 : 0
 
   statement {
-    sid = "EKS"
+    # Read-only EKS actions that do not support resource-level ARNs (AWS limitation).
+    sid = "EKSRead"
+    actions = [
+      "eks:DescribeAddonVersions", # no resource-level support
+      "eks:ListClusters",          # no resource-level support
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    # Mutating EKS actions scoped to clusters/nodegroups/addons under the eks-* prefix.
+    # This enforces least privilege: the deploy role cannot touch clusters it didn't create.
+    sid = "EKSMutate"
     actions = [
       "eks:CreateCluster",
       "eks:DeleteCluster",
       "eks:DescribeCluster",
       "eks:DescribeUpdate",
-      "eks:ListClusters",
       "eks:UpdateClusterConfig",
       "eks:UpdateClusterVersion",
+      "eks:TagResource",
+      "eks:UntagResource",
+      "eks:ListTagsForResource",
+      "eks:AccessKubernetesApi",
+    ]
+    resources = [
+      "arn:aws:eks:*:${data.aws_caller_identity.current[0].account_id}:cluster/eks-*",
+    ]
+  }
+
+  statement {
+    sid = "EKSNodegroups"
+    actions = [
       "eks:CreateNodegroup",
       "eks:DeleteNodegroup",
       "eks:DescribeNodegroup",
       "eks:ListNodegroups",
       "eks:UpdateNodegroupConfig",
       "eks:UpdateNodegroupVersion",
+    ]
+    resources = [
+      "arn:aws:eks:*:${data.aws_caller_identity.current[0].account_id}:cluster/eks-*",
+      "arn:aws:eks:*:${data.aws_caller_identity.current[0].account_id}:nodegroup/eks-*/*/*",
+    ]
+  }
+
+  statement {
+    sid = "EKSAddons"
+    actions = [
       "eks:CreateAddon",
       "eks:DeleteAddon",
       "eks:DescribeAddon",
-      "eks:DescribeAddonVersions",
       "eks:ListAddons",
       "eks:UpdateAddon",
-      "eks:TagResource",
-      "eks:UntagResource",
-      "eks:ListTagsForResource",
+    ]
+    resources = [
+      "arn:aws:eks:*:${data.aws_caller_identity.current[0].account_id}:cluster/eks-*",
+      "arn:aws:eks:*:${data.aws_caller_identity.current[0].account_id}:addon/eks-*/*/*",
+    ]
+  }
+
+  statement {
+    sid = "EKSAccessEntries"
+    actions = [
       "eks:AssociateAccessPolicy",
       "eks:DisassociateAccessPolicy",
       "eks:ListAssociatedAccessPolicies",
@@ -99,9 +139,11 @@ data "aws_iam_policy_document" "gha" {
       "eks:DescribeAccessEntry",
       "eks:ListAccessEntries",
       "eks:UpdateAccessEntry",
-      "eks:AccessKubernetesApi",
     ]
-    resources = ["*"]
+    resources = [
+      "arn:aws:eks:*:${data.aws_caller_identity.current[0].account_id}:cluster/eks-*",
+      "arn:aws:eks:*:${data.aws_caller_identity.current[0].account_id}:access-entry/eks-*/*/*/*",
+    ]
   }
 
   statement {
@@ -165,10 +207,66 @@ data "aws_iam_policy_document" "gha" {
   }
 
   statement {
+    # ELB does not support resource-level ARNs for most actions (AWS limitation).
+    # Scoped to the specific actions Terraform + in-tree cloud provider require.
     sid = "LoadBalancing"
     actions = [
-      "elasticloadbalancing:*",
-      "autoscaling:*",
+      "elasticloadbalancing:AddTags",
+      "elasticloadbalancing:CreateListener",
+      "elasticloadbalancing:CreateLoadBalancer",
+      "elasticloadbalancing:CreateRule",
+      "elasticloadbalancing:CreateTargetGroup",
+      "elasticloadbalancing:DeleteListener",
+      "elasticloadbalancing:DeleteLoadBalancer",
+      "elasticloadbalancing:DeleteRule",
+      "elasticloadbalancing:DeleteTargetGroup",
+      "elasticloadbalancing:DeregisterTargets",
+      "elasticloadbalancing:DescribeListeners",
+      "elasticloadbalancing:DescribeLoadBalancerAttributes",
+      "elasticloadbalancing:DescribeLoadBalancers",
+      "elasticloadbalancing:DescribeRules",
+      "elasticloadbalancing:DescribeTags",
+      "elasticloadbalancing:DescribeTargetGroupAttributes",
+      "elasticloadbalancing:DescribeTargetGroups",
+      "elasticloadbalancing:DescribeTargetHealth",
+      "elasticloadbalancing:ModifyListener",
+      "elasticloadbalancing:ModifyLoadBalancerAttributes",
+      "elasticloadbalancing:ModifyRule",
+      "elasticloadbalancing:ModifyTargetGroup",
+      "elasticloadbalancing:ModifyTargetGroupAttributes",
+      "elasticloadbalancing:RegisterTargets",
+      "elasticloadbalancing:RemoveTags",
+      "elasticloadbalancing:SetSecurityGroups",
+      "elasticloadbalancing:SetSubnets",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    # Autoscaling is used by EKS managed node groups.
+    # Scoped to explicit actions; DeleteAutoScalingGroup is intentionally excluded
+    # (node group deletion goes through eks:DeleteNodegroup, not directly).
+    sid = "AutoScaling"
+    actions = [
+      "autoscaling:CreateAutoScalingGroup",
+      "autoscaling:DeleteAutoScalingGroup",
+      "autoscaling:DescribeAutoScalingGroups",
+      "autoscaling:DescribeAutoScalingInstances",
+      "autoscaling:DescribeLaunchConfigurations",
+      "autoscaling:DescribeScalingActivities",
+      "autoscaling:DescribeScheduledActions",
+      "autoscaling:SetDesiredCapacity",
+      "autoscaling:TerminateInstanceInAutoScalingGroup",
+      "autoscaling:UpdateAutoScalingGroup",
+      "autoscaling:EnableMetricsCollection",
+      "autoscaling:DisableMetricsCollection",
+      "autoscaling:PutScalingPolicy",
+      "autoscaling:DeleteScalingPolicy",
+      "autoscaling:AttachLoadBalancerTargetGroups",
+      "autoscaling:DetachLoadBalancerTargetGroups",
+      "autoscaling:CreateOrUpdateTags",
+      "autoscaling:DeleteTags",
+      "autoscaling:DescribeTags",
     ]
     resources = ["*"]
   }
