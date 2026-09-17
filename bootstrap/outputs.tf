@@ -9,8 +9,13 @@ output "state_bucket" {
 }
 
 output "gha_role_arn" {
-  description = "Role GitHub Actions assumes via OIDC after bootstrap."
+  description = "Original sentinel-gha role (trust policy is immutable for this IAM user)."
   value       = module.gha.gha_role_arn
+}
+
+output "gha_ci_role_arn" {
+  description = "Role GitHub Actions assumes via OIDC (sentinel-gha-ci)."
+  value       = module.gha_ci.gha_role_arn
 }
 
 output "github_oidc_provider_arn" {

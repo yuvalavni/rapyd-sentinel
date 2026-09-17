@@ -100,8 +100,8 @@ jobs:
         run: |
           echo "AWS_ACCOUNT_ID=$(terraform output -raw aws_account_id)"
           echo "TF_STATE_BUCKET=$(terraform output -raw state_bucket)"
-          echo "GHA_ROLE_ARN=$(terraform output -raw gha_role_arn)"
+          echo "GHA_ROLE_ARN=$(terraform output -raw gha_ci_role_arn)"
           echo
           echo "Set GitHub Actions variables:"
           echo "  AWS_ACCOUNT_ID = $(terraform output -raw aws_account_id)"
-          echo "Then push to main; deploy.yml assumes role sentinel-gha via OIDC."
+          echo "Then push to main; deploy.yml assumes role sentinel-gha-ci via OIDC."
