@@ -56,9 +56,7 @@ module "gha" {
   github_org                 = var.github_org
   github_repo                = var.github_repo
   oidc_sub_refs = [
-    "ref:refs/heads/main",
-    "environment:aws",
-    "environment:bootstrap",
+    "*",
   ]
   state_bucket_arn = aws_s3_bucket.state.arn
   tags             = var.tags
